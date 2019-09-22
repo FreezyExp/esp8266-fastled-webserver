@@ -16,9 +16,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-//#define FASTLED_ALLOW_INTERRUPTS 1
-//#define INTERRUPT_THRESHOLD 1
-
 #define ARRAY_SIZE(A) (sizeof(A) / sizeof((A)[0]))
 extern "C" {
 #include "user_interface.h"
@@ -54,14 +51,19 @@ const char * mDNS_Name = "lights";
 // char* ssid = "your-ssid";
 // char* password = "your-password";
 
+#define FRAME_ONCE_EVERY_MS 1000 / FRAMES_PER_SECOND
+bool isOff = false;
+
 void setup() {
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
-
+  
   LEDSetup();
 
-  Serial.begin(115200);
+  Serial.begin(74880);
   delay(100);
   Serial.setDebugOutput(true);
+
+  Serial.print(F("Port: ")); Serial.println(DATA_PIN);
 
   EEPROM.begin(512);
   loadSettings();
@@ -131,9 +133,7 @@ void setup() {
   if (!MDNS.begin(mDNS_Name)) { // Start the mDNS responder for esp8266.local
     Serial.println("Error setting up MDNS responder!");
   }
-
-  autoPlayTimeout = millis() + (autoplayDuration * 1000);
-
+  
   setupWebServer();
 }
 
@@ -144,15 +144,21 @@ void loop() {
   //  dnsServer.processNextRequest();
   //  webSocketsServer.loop();
   webServer.handleClient();
-  //yield();
+  yield();
   //  handleIrInput();
 
   if (power == 0) {
-    fill_solid(leds, NUM_LEDS, CRGB::Black);
-    FastLED.show();
-    //yield();
-    // FastLED.delay(15);
+    if (!isOff)
+    {
+      fill_solid(leds, NUM_LEDS, CRGB::Black);
+      FastLED.show();
+      isOff = true;
+    }
+    FastLED.delay(100); // sleep-ish?
     return;
+  }
+  else {
+    isOff = false;
   }
 
   static bool hasConnected = false;
@@ -172,10 +178,6 @@ void loop() {
     }
   }
 
-  // EVERY_N_SECONDS(10) {
-  //   Serial.print( F("Heap: ") ); Serial.println(system_get_free_heap_size());
-  // }
-
   // change to a new cpt-city gradient palette
   EVERY_N_SECONDS(secondsPerPalette) {
     gCurrentPaletteNumber = addmod8(gCurrentPaletteNumber, 1, gGradientPaletteCount);
@@ -188,18 +190,12 @@ void loop() {
     gHue++;  // slowly cycle the "base color" through the rainbow
   }
 
-  if (autoplay && (millis() > autoPlayTimeout)) {
-    adjustPattern(true);
-    autoPlayTimeout = millis() + (autoplayDuration * 1000);
+  // keep the framerate modest, handles client sooner then a delay
+  EVERY_N_MILLISECONDS(FRAME_ONCE_EVERY_MS) {
+    // Call the current pattern function once, updating the 'leds' array
+    patterns[currentPatternIndex].pattern();
+    FastLED.show();
   }
-
-  // Call the current pattern function once, updating the 'leds' array
-  patterns[currentPatternIndex].pattern();
-
-  FastLED.show();
-
-  // insert a delay to keep the framerate modest
-  FastLED.delay(1000 / FRAMES_PER_SECOND);
 }
 
 void loadSettings()
@@ -225,9 +221,6 @@ void loadSettings()
   }
 
   power = EEPROM.read(5);
-
-  autoplay = EEPROM.read(6);
-  autoplayDuration = EEPROM.read(7);
 
   currentPaletteIndex = EEPROM.read(8);
   if (currentPaletteIndex < 0)

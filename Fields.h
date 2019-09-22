@@ -71,14 +71,6 @@ String getPalettes() {
   return json;
 }
 
-String getAutoplay() {
-  return String(autoplay);
-}
-
-String getAutoplayDuration() {
-  return String(autoplayDuration);
-}
-
 String getSolidColor() {
   return String(solidColor.r) + "," + String(solidColor.g) + "," + String(solidColor.b);
 }

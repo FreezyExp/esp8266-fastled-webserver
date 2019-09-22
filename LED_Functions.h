@@ -48,11 +48,6 @@ CRGBPalette16 gTargetPalette( gGradientPalettes[0] );
 CRGBPalette16 IceColors_p = CRGBPalette16(CRGB::Black, CRGB::Blue, CRGB::Aqua, CRGB::White);
 
 uint8_t currentPatternIndex = 0; // Index number of which pattern is current
-uint8_t autoplay = 0;
-
-uint8_t autoplayDuration = 10;
-unsigned long autoPlayTimeout = 0;
-
 uint8_t currentPaletteIndex = 0;
 
 uint8_t gHue = 0; // rotating "base color" used by many of the patterns

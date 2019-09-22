@@ -83,11 +83,14 @@ void broadcastString(String name, String value)
 String formatBytes(size_t bytes) {
   if (bytes < 1024) {
     return String(bytes) + "B";
-  } else if(bytes < (1024 * 1024)){
+  }
+  else if (bytes < (1024 * 1024)) {
     return String(bytes / 1024.0) + "KB";
-  } else if(bytes < (1024 * 1024 * 1024)){
+  }
+  else if (bytes < (1024 * 1024 * 1024)) {
     return String(bytes / 1024.0 / 1024.0) + "MB";
-  } else {
+  }
+  else {
     return String(bytes / 1024.0 / 1024.0 / 1024.0) + "GB";
   }
 }
@@ -136,11 +139,13 @@ void handleFileUpload() {
     Serial.print("handleFileUpload Name: "); Serial.println(filename);
     fsUploadFile = SPIFFS.open(filename, "w");
     filename = String();
-  } else if(upload.status == UPLOAD_FILE_WRITE){
+  }
+  else if (upload.status == UPLOAD_FILE_WRITE) {
     //Serial.print("handleFileUpload Data: "); Serial.println(upload.currentSize);
     if (fsUploadFile)
       fsUploadFile.write(upload.buf, upload.currentSize);
-  } else if(upload.status == UPLOAD_FILE_END){
+  }
+  else if (upload.status == UPLOAD_FILE_END) {
     if (fsUploadFile)
       fsUploadFile.close();
     Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
@@ -219,28 +224,6 @@ void setPower(uint8_t value)
   broadcastInt("power", power);
 }
 
-void setAutoplay(uint8_t value)
-{
-  autoplay = value == 0 ? 0 : 1;
-
-  EEPROM.write(6, autoplay);
-  EEPROM.commit();
-
-  broadcastInt("autoplay", autoplay);
-}
-
-void setAutoplayDuration(uint8_t value)
-{
-  autoplayDuration = value;
-
-  EEPROM.write(7, autoplayDuration);
-  EEPROM.commit();
-
-  autoPlayTimeout = millis() + (autoplayDuration * 1000);
-
-  broadcastInt("autoplayDuration", autoplayDuration);
-}
-
 void setSolidColor(CRGB color)
 {
   setSolidColor(color.r, color.g, color.b);
@@ -274,10 +257,8 @@ void adjustPattern(bool up)
   if (currentPatternIndex >= patternCount)
     currentPatternIndex = 0;
 
-  if (autoplay == 0) {
   EEPROM.write(1, currentPatternIndex);
   EEPROM.commit();
-  }
 
   broadcastInt("pattern", currentPatternIndex);
 }
@@ -289,10 +270,8 @@ void setPattern(uint8_t value)
 
   currentPatternIndex = value;
 
-  if (autoplay == 0) {
   EEPROM.write(1, currentPatternIndex);
   EEPROM.commit();
-  }
 
   broadcastInt("pattern", currentPatternIndex);
 }
@@ -486,18 +465,6 @@ void setupWebServer()
     sendInt(brightness);
   });
   
-  webServer.on("/autoplay", HTTP_POST, []() {
-    String value = webServer.arg("value");
-    setAutoplay(value.toInt());
-    sendInt(autoplay);
-  });
-
-  webServer.on("/autoplayDuration", HTTP_POST, []() {
-    String value = webServer.arg("value");
-    setAutoplayDuration(value.toInt());
-    sendInt(autoplayDuration);
-  });
-
   //list directory
   webServer.on("/list", HTTP_GET, handleFileList);
   //load editor
