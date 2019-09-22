@@ -40,6 +40,18 @@ void setBrightness(uint8_t);
 /////////////////////////  Function Definitions    ///////////////////
 //////////////////////////////////////////////////////////////////////
 
+void sendCors()
+{
+  if (webServer.hasHeader("origin")) {
+      String originValue = webServer.header("origin");
+      webServer.sendHeader("Access-Control-Allow-Origin", originValue);
+      webServer.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+      webServer.sendHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+      webServer.sendHeader("Access-Control-Max-Age", "600");
+      webServer.sendHeader("Vary", "Origin");
+  }
+}
+
 
 void sendInt(uint8_t value)
 {
@@ -68,42 +80,43 @@ void broadcastString(String name, String value)
 
 
 //format bytes
-String formatBytes(size_t bytes){
-  if (bytes < 1024){
-    return String(bytes)+"B";
+String formatBytes(size_t bytes) {
+  if (bytes < 1024) {
+    return String(bytes) + "B";
   } else if(bytes < (1024 * 1024)){
-    return String(bytes/1024.0)+"KB";
+    return String(bytes / 1024.0) + "KB";
   } else if(bytes < (1024 * 1024 * 1024)){
-    return String(bytes/1024.0/1024.0)+"MB";
+    return String(bytes / 1024.0 / 1024.0) + "MB";
   } else {
-    return String(bytes/1024.0/1024.0/1024.0)+"GB";
+    return String(bytes / 1024.0 / 1024.0 / 1024.0) + "GB";
   }
 }
 
-String getContentType(String filename){
-  if(webServer.hasArg("download")) return "application/octet-stream";
-  else if(filename.endsWith(".htm")) return "text/html";
-  else if(filename.endsWith(".html")) return "text/html";
-  else if(filename.endsWith(".css")) return "text/css";
-  else if(filename.endsWith(".js")) return "application/javascript";
-  else if(filename.endsWith(".png")) return "image/png";
-  else if(filename.endsWith(".gif")) return "image/gif";
-  else if(filename.endsWith(".jpg")) return "image/jpeg";
-  else if(filename.endsWith(".ico")) return "image/x-icon";
-  else if(filename.endsWith(".xml")) return "text/xml";
-  else if(filename.endsWith(".pdf")) return "application/x-pdf";
-  else if(filename.endsWith(".zip")) return "application/x-zip";
-  else if(filename.endsWith(".gz")) return "application/x-gzip";
+String getContentType(String filename) {
+  if (webServer.hasArg("download")) return "application/octet-stream";
+  else if (filename.endsWith(".htm")) return "text/html";
+  else if (filename.endsWith(".html")) return "text/html";
+  else if (filename.endsWith(".css")) return "text/css";
+  else if (filename.endsWith(".js")) return "application/javascript";
+  else if (filename.endsWith(".png")) return "image/png";
+  else if (filename.endsWith(".gif")) return "image/gif";
+  else if (filename.endsWith(".jpg")) return "image/jpeg";
+  else if (filename.endsWith(".ico")) return "image/x-icon";
+  else if (filename.endsWith(".xml")) return "text/xml";
+  else if (filename.endsWith(".pdf")) return "application/x-pdf";
+  else if (filename.endsWith(".zip")) return "application/x-zip";
+  else if (filename.endsWith(".gz")) return "application/x-gzip";
   return "text/plain";
 }
 
-bool handleFileRead(String path){
+bool handleFileRead(String path) {
+  sendCors();
   Serial.println("handleFileRead: " + path);
-  if(path.endsWith("/")) path += "index.htm";
+  if (path.endsWith("/")) path += "index.htm";
   String contentType = getContentType(path);
   String pathWithGz = path + ".gz";
-  if(SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)){
-    if(SPIFFS.exists(pathWithGz))
+  if (SPIFFS.exists(pathWithGz) || SPIFFS.exists(path)) {
+    if (SPIFFS.exists(pathWithGz))
       path += ".gz";
     File file = SPIFFS.open(path, "r");
     size_t sent = webServer.streamFile(file, contentType);
@@ -113,50 +126,53 @@ bool handleFileRead(String path){
   return false;
 }
 
-void handleFileUpload(){
-  if(webServer.uri() != "/edit") return;
+void handleFileUpload() {
+  sendCors();
+  if (webServer.uri() != "/edit") return;
   HTTPUpload& upload = webServer.upload();
-  if(upload.status == UPLOAD_FILE_START){
+  if (upload.status == UPLOAD_FILE_START) {
     String filename = upload.filename;
-    if(!filename.startsWith("/")) filename = "/"+filename;
+    if (!filename.startsWith("/")) filename = "/" + filename;
     Serial.print("handleFileUpload Name: "); Serial.println(filename);
     fsUploadFile = SPIFFS.open(filename, "w");
     filename = String();
   } else if(upload.status == UPLOAD_FILE_WRITE){
     //Serial.print("handleFileUpload Data: "); Serial.println(upload.currentSize);
-    if(fsUploadFile)
+    if (fsUploadFile)
       fsUploadFile.write(upload.buf, upload.currentSize);
   } else if(upload.status == UPLOAD_FILE_END){
-    if(fsUploadFile)
+    if (fsUploadFile)
       fsUploadFile.close();
     Serial.print("handleFileUpload Size: "); Serial.println(upload.totalSize);
   }
 }
 
-void handleFileDelete(){
-  if(webServer.args() == 0) return webServer.send(500, "text/plain", "BAD ARGS");
+void handleFileDelete() {
+  sendCors();
+  if (webServer.args() == 0) return webServer.send(500, "text/plain", "BAD ARGS");
   String path = webServer.arg(0);
   Serial.println("handleFileDelete: " + path);
-  if(path == "/")
+  if (path == "/")
     return webServer.send(500, "text/plain", "BAD PATH");
-  if(!SPIFFS.exists(path))
+  if (!SPIFFS.exists(path))
     return webServer.send(404, "text/plain", "FileNotFound");
   SPIFFS.remove(path);
   webServer.send(200, "text/plain", "");
   path = String();
 }
 
-void handleFileCreate(){
-  if(webServer.args() == 0)
+void handleFileCreate() {
+  sendCors();
+  if (webServer.args() == 0)
     return webServer.send(500, "text/plain", "BAD ARGS");
   String path = webServer.arg(0);
   Serial.println("handleFileCreate: " + path);
-  if(path == "/")
+  if (path == "/")
     return webServer.send(500, "text/plain", "BAD PATH");
-  if(SPIFFS.exists(path))
+  if (SPIFFS.exists(path))
     return webServer.send(500, "text/plain", "FILE EXISTS");
   File file = SPIFFS.open(path, "w");
-  if(file)
+  if (file)
     file.close();
   else
     return webServer.send(500, "text/plain", "CREATE FAILED");
@@ -165,26 +181,28 @@ void handleFileCreate(){
 }
 
 void handleFileList() {
-  if(!webServer.hasArg("dir")) {webServer.send(500, "text/plain", "BAD ARGS"); return;}
+  sendCors();
   
+  if (!webServer.hasArg("dir")) { webServer.send(500, "text/plain", "BAD ARGS"); return; }
+
   String path = webServer.arg("dir");
   Serial.println("handleFileList: " + path);
   Dir dir = SPIFFS.openDir(path);
   path = String();
 
   String output = "[";
-  while(dir.next()){
+  while (dir.next()) {
     File entry = dir.openFile("r");
     if (output != "[") output += ',';
     bool isDir = false;
     output += "{\"type\":\"";
-    output += (isDir)?"dir":"file";
+    output += (isDir) ? "dir" : "file";
     output += "\",\"name\":\"";
     output += String(entry.name()).substring(1);
     output += "\"}";
     entry.close();
   }
-  
+
   output += "]";
   webServer.send(200, "text/json", output);
 }
@@ -257,8 +275,8 @@ void adjustPattern(bool up)
     currentPatternIndex = 0;
 
   if (autoplay == 0) {
-    EEPROM.write(1, currentPatternIndex);
-    EEPROM.commit();
+  EEPROM.write(1, currentPatternIndex);
+  EEPROM.commit();
   }
 
   broadcastInt("pattern", currentPatternIndex);
@@ -272,8 +290,8 @@ void setPattern(uint8_t value)
   currentPatternIndex = value;
 
   if (autoplay == 0) {
-    EEPROM.write(1, currentPatternIndex);
-    EEPROM.commit();
+  EEPROM.write(1, currentPatternIndex);
+  EEPROM.commit();
   }
 
   broadcastInt("pattern", currentPatternIndex);
@@ -353,17 +371,20 @@ void setupWebServer()
   httpUpdateServer.setup(&webServer);
 
   webServer.on("/all", HTTP_GET, []() {
+    sendCors();
     String json = getFieldsJson(fields, fieldCount);
     webServer.send(200, "text/json", json);
   });
 
   webServer.on("/fieldValue", HTTP_GET, []() {
+    sendCors();
     String name = webServer.arg("name");
     String value = getFieldValue(name, fields, fieldCount);
     webServer.send(200, "text/json", value);
   });
 
   webServer.on("/fieldValue", HTTP_POST, []() {
+    sendCors();
     String name = webServer.arg("name");
     String value = webServer.arg("value");
     String newValue = setFieldValue(name, value, fields, fieldCount);
@@ -371,12 +392,14 @@ void setupWebServer()
   });
 
   webServer.on("/power", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     setPower(value.toInt());
     sendInt(power);
   });
 
   webServer.on("/cooling", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     cooling = value.toInt();
     broadcastInt("cooling", cooling);
@@ -384,6 +407,7 @@ void setupWebServer()
   });
 
   webServer.on("/sparking", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     sparking = value.toInt();
     broadcastInt("sparking", sparking);
@@ -391,6 +415,7 @@ void setupWebServer()
   });
 
   webServer.on("/speed", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     speed = value.toInt();
     broadcastInt("speed", speed);
@@ -398,6 +423,7 @@ void setupWebServer()
   });
 
   webServer.on("/twinkleSpeed", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     twinkleSpeed[0] = value.toInt();
     if (twinkleSpeed[0] < 0) twinkleSpeed[0] = 0;
@@ -407,6 +433,7 @@ void setupWebServer()
   });
 
   webServer.on("/twinkleDensity", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     twinkleDensity[0] = value.toInt();
     if (twinkleDensity[0] < 0) twinkleDensity[0] = 0;
@@ -416,6 +443,7 @@ void setupWebServer()
   });
 
   webServer.on("/solidColor", HTTP_POST, []() {
+    sendCors();
     String r = webServer.arg("r");
     String g = webServer.arg("g");
     String b = webServer.arg("b");
@@ -424,35 +452,40 @@ void setupWebServer()
   });
 
   webServer.on("/pattern", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     setPattern(value.toInt());
     sendInt(currentPatternIndex);
   });
 
   webServer.on("/patternName", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     setPatternName(value);
     sendInt(currentPatternIndex);
   });
 
   webServer.on("/palette", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     setPalette(value.toInt());
     sendInt(currentPaletteIndex);
   });
 
   webServer.on("/paletteName", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     setPaletteName(value);
     sendInt(currentPaletteIndex);
   });
 
   webServer.on("/brightness", HTTP_POST, []() {
+    sendCors();
     String value = webServer.arg("value");
     setBrightness(value.toInt());
     sendInt(brightness);
   });
-
+  
   webServer.on("/autoplay", HTTP_POST, []() {
     String value = webServer.arg("value");
     setAutoplay(value.toInt());
@@ -469,6 +502,7 @@ void setupWebServer()
   webServer.on("/list", HTTP_GET, handleFileList);
   //load editor
   webServer.on("/edit", HTTP_GET, []() {
+    sendCors();
     if (!handleFileRead("/edit.htm")) webServer.send(404, "text/plain", "FileNotFound");
   });
   //create file
@@ -478,10 +512,18 @@ void setupWebServer()
   //first callback is called after the request has ended with all parsed arguments
   //second callback handles file uploads at that location
   webServer.on("/edit", HTTP_POST, []() {
+    sendCors();
     webServer.send(200, "text/plain", "");
   }, handleFileUpload);
 
   webServer.serveStatic("/", SPIFFS, "/", "max-age=86400");
+
+  // list of headers to be recorded
+  const char * headerkeys[] = {"origin"};
+  size_t headerkeyssize = sizeof(headerkeys)/sizeof(char*);
+
+  // ask server to track these headers
+  webServer.collectHeaders(headerkeys, headerkeyssize);
 
   webServer.begin();
 
@@ -489,4 +531,3 @@ void setupWebServer()
   Serial.println("HTTP web server started");
 
 }
-
