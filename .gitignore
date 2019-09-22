@@ -1,6 +1,10 @@
+.DS_Store
+Secrets.h
+build/
+buildcache/
+
 Debug/
 Release/
-Secrets.h
 .vs/
 __vm/
 esp8266-fastled-webserver.vcxproj.filters
