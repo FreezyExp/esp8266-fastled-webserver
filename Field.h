@@ -1,3 +1,4 @@
+#include <ArduinoJson.h>
 /*
    ESP8266 + FastLED + IR Remote: https://github.com/jasoncoon/esp8266-fastled-webserver
    Copyright (C) 2016 Jason Coon
@@ -64,7 +65,43 @@ String setFieldValue(String name, String value, FieldList fields, uint8_t count)
   return String();
 }
 
-String getFieldsJson(FieldList fields, uint8_t count) {
+// goto /all, grab json reply
+// https://arduinojson.org/v6/assistant/  
+// add a bit more
+const size_t capacity = 2000;
+StaticJsonDocument<capacity> jsonDoc;
+
+String getFieldsJson(FieldList fields, uint8_t count) 
+{ 
+  jsonDoc.clear();
+  Field field; 
+  JsonObject node_i;
+  for (uint8_t i = 0; i < count; i++) {
+    field = fields[i];
+
+    node_i = jsonDoc.createNestedObject();
+    node_i["name"] = field.name;
+    node_i["label"] = field.label;
+    node_i["type"] = field.type;
+    if (field.type == NumberFieldType) {
+      node_i["min"] = field.min;
+      node_i["max"] = field.max;
+    }
+
+    if (field.getOptions) {
+      node_i["options"] = field.getOptions();
+    }
+    
+    // we could try to be smarter with this being the only dynamic field
+    // but jsonobject copies every string leading to memory leaks, if we don't recreate it each time
+    node_i["value"] = field.getValue();
+  }
+
+  // TODO, implement a stream to webServer approach here:
+  String strJson;
+  serializeJson(jsonDoc, strJson);
+  return strJson;
+/*
   String json = "[";
 
   for (uint8_t i = 0; i < count; i++) {
@@ -100,7 +137,7 @@ String getFieldsJson(FieldList fields, uint8_t count) {
 
   json += "]";
 
-  return json;
+  return json;*/
 }
 
 /*
