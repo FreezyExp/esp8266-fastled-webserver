@@ -63,27 +63,12 @@
 // Overall twinkle speed.
 // 0 (VERY slow) to 8 (VERY fast).
 // 4, 5, and 6 are recommended, default is 4.
-#define STARS_TWINKLE_SPEED 4
-#define AURORA_TWINKLE_SPEED 2
-
-#define STARS_TWINKLE_DENSITY 1
-#define AURORA_TWINKLE_DENSITY 4
-
-#define STARS 0
-#define AURORA 1
-
-uint8_t twinkleSpeed[2] = {5,3};
-
-CRGB AuroraLeds[2][NUM_LEDS]; // First array is for Top/Bottom
-
-
-bool fillAurora = false;
-
+uint8_t twinkleSpeed = 4;
 
 // Overall twinkle density.
 // 0 (NONE lit) to 8 (ALL lit at once).
 // Default is 5.
-uint8_t twinkleDensity[2] = {1,6};
+uint8_t twinkleDensity = 5;
 
 // Background color for 'unlit' pixels
 // Can be set to CRGB::Black if desired.
@@ -147,11 +132,7 @@ void coolLikeIncandescent( CRGB& c, uint8_t phase)
 //  should light at all during this cycle, based on the twinkleDensity.
 CRGB computeOneTwinkle( uint32_t ms, uint8_t salt)
 {
-  uint8_t side = 0;
-  if(fillAurora == true){ 
-    side = 1;
-  }
-  uint16_t ticks = ms >> (8-twinkleSpeed[side]);
+  uint16_t ticks = ms >> (8-twinkleSpeed);
   uint8_t fastcycle8 = ticks;
   uint16_t slowcycle16 = (ticks >> 8) + salt;
   slowcycle16 += sin8( slowcycle16);
@@ -159,7 +140,7 @@ CRGB computeOneTwinkle( uint32_t ms, uint8_t salt)
   uint8_t slowcycle8 = (slowcycle16 & 0xFF) + (slowcycle16 >> 8);
 
   uint8_t bright = 0;
-  if( ((slowcycle8 & 0x0E)/2) < twinkleDensity[side]) {
+  if( ((slowcycle8 & 0x0E)/2) < twinkleDensity) {
     bright = attackDecayWave8( fastcycle8);
   }
 
@@ -183,15 +164,11 @@ CRGB computeOneTwinkle( uint32_t ms, uint8_t salt)
 //  whichever is brighter.
 void drawTwinkles()
 {
-  uint8_t side = 0;
-  if(fillAurora == true){ 
-    side = 1;
-  }
   // "PRNG16" is the pseudorandom number generator
   // It MUST be reset to the same starting value each time
   // this function is called, so that the sequence of 'random'
   // numbers that it generates is (paradoxically) stable.
-  uint16_t PRNG16[2] = {11337, 4206};
+  uint16_t PRNG16 = 11337;
 
   uint32_t clock32 = millis();
 
@@ -218,21 +195,20 @@ void drawTwinkles()
   uint8_t backgroundBrightness = bg.getAverageLight();
 
   for(uint16_t i = 0; i < NUM_LEDS; i++) {
-    CRGB& pixel = AuroraLeds[side][i];
+    CRGB& pixel = leds[i];
 
-    PRNG16[side] = (uint16_t)(PRNG16[side] * 2053) + 1384; // next 'random' number
-    uint16_t myclockoffset16= PRNG16[side]; // use that number as clock offset
-    PRNG16[side] = (uint16_t)(PRNG16[side] * 2053) + 1384; // next 'random' number
+    PRNG16 = (uint16_t)(PRNG16 * 2053) + 1384; // next 'random' number
+    uint16_t myclockoffset16= PRNG16; // use that number as clock offset
+    PRNG16 = (uint16_t)(PRNG16 * 2053) + 1384; // next 'random' number
     // use that number as clock speed adjustment factor (in 8ths, from 8/8ths to 23/8ths)
-    uint8_t myspeedmultiplierQ5_3 =  ((((PRNG16[side] & 0xFF)>>4) + (PRNG16[side] & 0x0F)) & 0x0F) + 0x08;
+    uint8_t myspeedmultiplierQ5_3 =  ((((PRNG16 & 0xFF)>>4) + (PRNG16 & 0x0F)) & 0x0F) + 0x08;
     uint32_t myclock30 = (uint32_t)((clock32 * myspeedmultiplierQ5_3) >> 3) + myclockoffset16;
-    uint8_t  myunique8 = PRNG16[side] >> 8; // get 'salt' value for this pixel
+    uint8_t  myunique8 = PRNG16 >> 8; // get 'salt' value for this pixel
 
     // We now have the adjusted 'clock' for this pixel, now we call
     // the function that computes what color the pixel should be based
     // on the "brightness = f( time )" idea.
     CRGB c = computeOneTwinkle( myclock30, myunique8);
-    CRGB blk = CRGB::Black;
 
     uint8_t cbright = c.getAverageLight();
     int16_t deltabright = cbright - backgroundBrightness;
@@ -369,20 +345,6 @@ const TProgmemRGBPalette16 Ice_p FL_PROGMEM =
   Ice_Blue2, Ice_Blue2, Ice_Blue2, Ice_Blue3
 };
 
-// A cold, icy pale blue palette
-#define Green_1 0x14E81E
-#define Green_2 0x00EA8D
-#define Blue_1 0x017ED5
-#define Purple_1 0xB53DFF
-#define Purple_2 0x8D00C4
-const TProgmemRGBPalette16 Aurora_p FL_PROGMEM =
-{
-  Green_1, Green_1, Green_1, Green_2,
-  Green_2, Green_2, Green_2, Blue_1,
-  Blue_1, Blue_1, Blue_1, Purple_1,
-  Purple_1, Purple_1, Purple_2, Purple_2
-};
-
 void redGreenWhiteTwinkles()
 {
   twinkleFoxPalette = RedGreenWhite_p;
@@ -483,20 +445,5 @@ void oceanTwinkles()
 {
   twinkleFoxPalette = OceanColors_p;
   drawTwinkles();
-}
-
-
-void ifusTwinkles()
-{
-  fillAurora = false;
-  twinkleFoxPalette = White_p;
-  drawTwinkles();
-  fillAurora = true;
-  twinkleFoxPalette = Aurora_p;
-  drawTwinkles();
-  fillAurora = false;
-  for(uint16_t i = 0; i < NUM_LEDS; i++) {
-    leds[i] = AuroraLeds[0][i] + AuroraLeds[1][i];
-  }
 }
 
