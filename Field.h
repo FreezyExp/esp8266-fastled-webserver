@@ -21,9 +21,11 @@ typedef String (*FieldGetter)();
 
 const String NumberFieldType = "Number";
 const String BooleanFieldType = "Boolean";
+const String ButtonFieldType = "Button";
 const String SelectFieldType = "Select";
 const String ColorFieldType = "Color";
 const String SectionFieldType = "Section";
+const String TimeFieldType = "Time";
 
 typedef struct Field {
   String name;

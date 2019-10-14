@@ -26,7 +26,8 @@ ws.onmessage = function(evt) {
 $(document).ready(function() {
   $("#status").html("Connecting, please wait...");
 
-  $.get(urlBase + "all", function(data) {
+  $.get(urlBase + "all", 
+    function(data) {
       $("#status").html("Loading, please wait...");
 
       $.each(data, function(index, field) {
@@ -34,6 +35,8 @@ $(document).ready(function() {
           addNumberField(field);
         } else if (field.type == "Boolean") {
           addBooleanField(field);
+        } else if (field.type == "Button") {
+          addButtonField(field);
         } else if (field.type == "Select") {
           addSelectField(field);
         } else if (field.type == "Color") {
@@ -41,6 +44,8 @@ $(document).ready(function() {
           addColorFieldPicker(field);
         } else if (field.type == "Section") {
           addSectionField(field);
+        } else if (field.type == "Time") {
+          addTimeField(field);
         }
       });
 
@@ -136,6 +141,55 @@ function addBooleanField(field) {
   btnOff.click(function() {
     setBooleanFieldValue(field, btnOn, btnOff, 0)
   });
+
+  $("#form").append(template);
+}
+
+function addButtonField(field) {
+    var template = $("#switchesTemplate").clone();
+    
+    template.attr("id", "form-group-" + field.name);
+    template.attr("data-field-type", field.type);
+    
+    var label = template.find(".control-label");
+    label.attr("for", "btn-group-" + field.name);
+    label.text(field.label);
+        
+    var switches = template.find(".btn-toolbar");        
+    switches.attr("id", "btn-toolbar-" + field.name);
+        
+    for (var i = 0; i < field.options.length; i++) {
+        var button = $("#switchTemplate").clone();
+    
+        var grp = field.options[i];
+        var grpField = field.name + grp;
+        
+        button.attr("id", "btn-group-" + grpField);
+        button.attr("data-field-type", field.type);        
+  
+        var btngroup = button.find(".btn-group");
+        btngroup.attr("id", "btn-group-" + grpField);
+        
+        var btnOn = button.find("#btnOn");
+        var btnOff = button.find("#btnOff");
+
+        btnOn.text(grp + " On");
+        btnOff.text(grp + " Off");
+        
+        btnOn.attr("id", "btnOn" + grpField);
+        btnOff.attr("id", "btnOff" + grpField);
+
+        btnOn.attr("value", grp + "1");
+        btnOff.attr("value", grp + "0");
+
+        btnOn.click(function() {
+            postValue(field.name, $(this).val());
+        });
+        btnOff.click(function() {
+            postValue(field.name, $(this).val());
+        });
+        switches.append(button);
+    };
 
   $("#form").append(template);
 }
@@ -369,6 +423,60 @@ function addSectionField(field) {
   $("#form").append(template);
 }
 
+function addTimeField(field) {
+  var template = $("#timeTemplate").clone();
+  
+  template.attr("id", "form-group-" + field.name);
+  template.attr("data-field-type", field.type);
+
+  var id = "input-" + field.name;
+  
+  var label = template.find(".control-label");
+  label.attr("for", id);
+  label.text(field.label);
+  
+  var timeInput = template.find(".time-input");
+  timeInput.attr("id", id);
+  
+  var timeValue = template.find(".time-value");
+  timeValue.attr("id", id+"-value");
+  
+  var h = (field.value >>> 2) & 31;
+  var m = (field.value & 3) * 15;  
+  var set = h + ':' + (m > 10 ? m : '0'+m);
+  timeInput.attr("value", set);
+  timeValue.attr("value", set);
+    
+  timeInput.timepicker({ 
+    'step': 15,  
+    'forceRoundTime': true,   
+    'noneOption': [ { 'label':'off', 'value' : '-1' } ],
+    'timeFormat': 'H:i'
+  });
+  
+  timeInput.on('changeTime', function() {
+	var time = $(this).val();
+    var hm = time.split(':');
+    var set = 0;
+    if(hm.length == 2)
+    {
+        var h = parseInt(hm[0],10) << 2;
+        var m = parseInt(hm[1],10) / 15;
+        set = h | m;
+    }
+    else
+    {
+        set = -1;
+    }
+    field.value = set;
+    $("#"+id+"-value").attr('value', set);
+        
+    postValue(field.name, field.value);
+  });
+  
+  $("#form").append(template);    
+}
+
 function updateFieldValue(name, value) {
   var group = $("#form-group-" + name);
 
@@ -390,6 +498,8 @@ function updateFieldValue(name, value) {
   } else if (type == "Color") {
     var input = group.find(".form-control");
     input.val("rgb(" + value + ")");
+  } else if( type == "Time") {
+      var input = group.find(".form-control");
   }
 };
 

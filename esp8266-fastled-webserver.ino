@@ -21,17 +21,19 @@ extern "C" {
 #include "user_interface.h"
 }
 
-#include <FS.h>
-#include <EEPROM.h>
-
-#include "LED_Functions.h"
-#include "Field.h"
-#include "Fields.h"
-
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <ESP8266HTTPUpdateServer.h>
+
+
+#include "SaveData.h"
+
+#include "LED_Functions.h"
+
+#include "CustomAlarms.h"
+
 #include "Webserver_Functions.h"
+
 
 // ===== Settings =====
 
@@ -39,7 +41,7 @@ extern "C" {
 // #define AP_MODE
 
 // name of the device in the local network
-const char * mDNS_Name = "lights";
+const char* mDNS_Name = "lights";
 
 #include "Secrets.h" // this file is intentionally not included in the sketch, so nobody accidentally commits their secret information.
 // create a Secrets.h file with the following:
@@ -56,7 +58,7 @@ bool isOff = false;
 
 void setup() {
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
-  
+
   LEDSetup();
 
   Serial.begin(74880);
@@ -64,20 +66,6 @@ void setup() {
   Serial.setDebugOutput(true);
 
   Serial.print(F("Port: ")); Serial.println(DATA_PIN);
-
-  EEPROM.begin(512);
-  loadSettings();
-
-  Serial.println();
-  Serial.print(F("Heap: ")); Serial.println(system_get_free_heap_size());
-  Serial.print(F("Boot Vers: ")); Serial.println(system_get_boot_version());
-  Serial.print(F("CPU: ")); Serial.println(system_get_cpu_freq());
-  Serial.print(F("SDK: ")); Serial.println(system_get_sdk_version());
-  Serial.print(F("Chip ID: ")); Serial.println(system_get_chip_id());
-  Serial.print(F("Flash ID: ")); Serial.println(spi_flash_get_id());
-  Serial.print(F("Flash Size: ")); Serial.println(ESP.getFlashChipRealSize());
-  Serial.print(F("Vcc: ")); Serial.println(ESP.getVcc());
-  Serial.println();
 
   SPIFFS.begin();
   {
@@ -91,6 +79,20 @@ void setup() {
     }
     Serial.printf("\n");
   }
+
+  SaveData.load();
+  loadSettings();
+
+  Serial.println();
+  Serial.print(F("Heap: ")); Serial.println(system_get_free_heap_size());
+  Serial.print(F("Boot Vers: ")); Serial.println(system_get_boot_version());
+  Serial.print(F("CPU: ")); Serial.println(system_get_cpu_freq());
+  Serial.print(F("SDK: ")); Serial.println(system_get_sdk_version());
+  Serial.print(F("Chip ID: ")); Serial.println(system_get_chip_id());
+  Serial.print(F("Flash ID: ")); Serial.println(spi_flash_get_id());
+  Serial.print(F("Flash Size: ")); Serial.println(ESP.getFlashChipRealSize());
+  Serial.print(F("Vcc: ")); Serial.println(ESP.getVcc());
+  Serial.println();
 
   //disabled due to https://github.com/jasoncoon/esp8266-fastled-webserver/issues/62
   //initializeWiFi();
@@ -133,7 +135,8 @@ void setup() {
   if (!MDNS.begin(mDNS_Name)) { // Start the mDNS responder for esp8266.local
     Serial.println("Error setting up MDNS responder!");
   }
-  
+  MDNS.addService("http", "tcp", 80);
+
   setupWebServer();
 }
 
@@ -143,9 +146,14 @@ void loop() {
 
   //  dnsServer.processNextRequest();
   //  webSocketsServer.loop();
-  webServer.handleClient();
-  yield();
+  webServer.handleClient(); 
+  MDNS.update();
+
+  // yield(); // not needed thanks to updateTimer() -> events();
   //  handleIrInput();
+
+  // do this before power off check, as it might be time to turn it on
+  updateTimer();
 
   if (power == 0) {
     if (!isOff)
@@ -175,6 +183,8 @@ void loop() {
       Serial.print(" or http://");
       Serial.print(WiFi.localIP());
       Serial.println(" in your browser");
+
+      startTimer(WiFi.gatewayIP().toString());
     }
   }
 
@@ -200,17 +210,17 @@ void loop() {
 
 void loadSettings()
 {
-  brightness = EEPROM.read(0);
+  brightness = SaveData.read(0);
 
-  currentPatternIndex = EEPROM.read(1);
+  currentPatternIndex = SaveData.read(1);
   if (currentPatternIndex < 0)
     currentPatternIndex = 0;
   else if (currentPatternIndex >= patternCount)
     currentPatternIndex = patternCount - 1;
 
-  byte r = EEPROM.read(2);
-  byte g = EEPROM.read(3);
-  byte b = EEPROM.read(4);
+  byte r = SaveData.read(2);
+  byte g = SaveData.read(3);
+  byte b = SaveData.read(4);
 
   if (r == 0 && g == 0 && b == 0)
   {
@@ -220,9 +230,14 @@ void loadSettings()
     solidColor = CRGB(r, g, b);
   }
 
-  power = EEPROM.read(5);
+  power = SaveData.read(5);
 
-  currentPaletteIndex = EEPROM.read(8);
+  // skip 6, 7 they are read & rescheduled when time is retrieved
+  // 6 = timeOn
+  // 7 = timeOff
+  // rescheduleAlarms();
+
+  currentPaletteIndex = SaveData.read(8);
   if (currentPaletteIndex < 0)
     currentPaletteIndex = 0;
   else if (currentPaletteIndex >= paletteCount)

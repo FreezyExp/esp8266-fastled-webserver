@@ -1,4 +1,9 @@
 #include <ESP8266WebServer.h>
+#include <FS.h>
+
+#include "Field.h"
+#include "Fields.h"
+
 
 ESP8266WebServer webServer(80);
 ESP8266HTTPUpdateServer httpUpdateServer;
@@ -10,6 +15,7 @@ File fsUploadFile;
 /////////////////////////  Function Prototypes    ////////////////////
 //////////////////////////////////////////////////////////////////////
 void sendCors();
+void remoteSwitch(char letter, uint8_t on);
 void setupWebServer();
 void sendInt(uint8_t);
 void sendString(String);
@@ -43,15 +49,14 @@ void setBrightness(uint8_t);
 void sendCors()
 {
   if (webServer.hasHeader("origin")) {
-      String originValue = webServer.header("origin");
-      webServer.sendHeader("Access-Control-Allow-Origin", originValue);
-      webServer.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-      webServer.sendHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-      webServer.sendHeader("Access-Control-Max-Age", "600");
-      webServer.sendHeader("Vary", "Origin");
+    String originValue = webServer.header("origin");
+    webServer.sendHeader("Access-Control-Allow-Origin", originValue);
+    webServer.sendHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    webServer.sendHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    webServer.sendHeader("Access-Control-Max-Age", "600");
+    webServer.sendHeader("Vary", "Origin");
   }
 }
-
 
 void sendInt(uint8_t value)
 {
@@ -74,10 +79,6 @@ void broadcastString(String name, String value)
   String json = "{\"name\":\"" + name + "\",\"value\":\"" + String(value) + "\"}";
   //  webSocketsServer.broadcastTXT(json);
 }
-
-
-
-
 
 //format bytes
 String formatBytes(size_t bytes) {
@@ -187,7 +188,7 @@ void handleFileCreate() {
 
 void handleFileList() {
   sendCors();
-  
+
   if (!webServer.hasArg("dir")) { webServer.send(500, "text/plain", "BAD ARGS"); return; }
 
   String path = webServer.arg("dir");
@@ -212,16 +213,30 @@ void handleFileList() {
   webServer.send(200, "text/json", output);
 }
 
-
-
 void setPower(uint8_t value)
 {
-  power = value == 0 ? 0 : 1;
-
-  EEPROM.write(5, power);
-  EEPROM.commit();
-
+  power = value > 0;
+  SaveData.write(5, power);
+  SaveData.commit();
   broadcastInt("power", power);
+}
+
+void setTimerOn(uint8_t value)
+{
+  SaveData.write(6, value);
+  SaveData.commit();
+
+  Serial.println("Scheduling Alarm: Turn On");
+  rescheduleAlarm(turnOn, value, eventPowerOn, true);
+}
+
+void setTimerOff(uint8_t value)
+{
+  SaveData.write(7, value);
+  SaveData.commit();
+
+  Serial.println("Scheduling Alarm: Turn Off");
+  rescheduleAlarm(turnOff, value, eventPowerOff, true);
 }
 
 void setSolidColor(CRGB color)
@@ -233,11 +248,9 @@ void setSolidColor(uint8_t r, uint8_t g, uint8_t b)
 {
   solidColor = CRGB(r, g, b);
 
-  EEPROM.write(2, r);
-  EEPROM.write(3, g);
-  EEPROM.write(4, b);
-  EEPROM.commit();
-
+  SaveData.write(2, r);
+  SaveData.write(3, g);
+  SaveData.write(4, b);
   setPattern(patternCount - 1);
 
   broadcastString("color", String(solidColor.r) + "," + String(solidColor.g) + "," + String(solidColor.b));
@@ -257,8 +270,8 @@ void adjustPattern(bool up)
   if (currentPatternIndex >= patternCount)
     currentPatternIndex = 0;
 
-  EEPROM.write(1, currentPatternIndex);
-  EEPROM.commit();
+  SaveData.write(1, currentPatternIndex);
+  SaveData.commit();
 
   broadcastInt("pattern", currentPatternIndex);
 }
@@ -270,8 +283,8 @@ void setPattern(uint8_t value)
 
   currentPatternIndex = value;
 
-  EEPROM.write(1, currentPatternIndex);
-  EEPROM.commit();
+  SaveData.write(1, currentPatternIndex);
+  SaveData.commit();
 
   broadcastInt("pattern", currentPatternIndex);
 }
@@ -293,8 +306,10 @@ void setPalette(uint8_t value)
 
   currentPaletteIndex = value;
 
-  EEPROM.write(8, currentPaletteIndex);
-  EEPROM.commit();
+  SaveData.write(8, currentPaletteIndex);
+  SaveData.commit();
+
+  twinkleFoxPalette = palettes[currentPaletteIndex];
 
   broadcastInt("palette", currentPaletteIndex);
 }
@@ -320,8 +335,8 @@ void adjustBrightness(bool up)
 
   FastLED.setBrightness(brightness);
 
-  EEPROM.write(0, brightness);
-  EEPROM.commit();
+  SaveData.write(0, brightness);
+  SaveData.commit();
 
   broadcastInt("brightness", brightness);
 }
@@ -336,14 +351,11 @@ void setBrightness(uint8_t value)
 
   FastLED.setBrightness(brightness);
 
-  EEPROM.write(0, brightness);
-  EEPROM.commit();
+  SaveData.write(0, brightness);
+  SaveData.commit();
 
   broadcastInt("brightness", brightness);
 }
-
-
-
 
 void setupWebServer()
 {
@@ -377,6 +389,20 @@ void setupWebServer()
     sendInt(power);
   });
 
+  webServer.on("/timeOn", HTTP_POST, []() {
+    sendCors();
+    String value = webServer.arg("value");
+    setTimerOn(value.toInt());
+    sendInt(SaveData.read(6));
+  });
+
+  webServer.on("/timeOff", HTTP_POST, []() {
+    sendCors();
+    String value = webServer.arg("value");
+    setTimerOff(value.toInt());
+    sendInt(SaveData.read(7));
+  });
+
   webServer.on("/cooling", HTTP_POST, []() {
     sendCors();
     String value = webServer.arg("value");
@@ -404,21 +430,21 @@ void setupWebServer()
   webServer.on("/twinkleSpeed", HTTP_POST, []() {
     sendCors();
     String value = webServer.arg("value");
-    twinkleSpeed[0] = value.toInt();
-    if (twinkleSpeed[0] < 0) twinkleSpeed[0] = 0;
-    else if (twinkleSpeed[0] > 8) twinkleSpeed[0] = 8;
-    broadcastInt("twinkleSpeed", twinkleSpeed[0]);
-    sendInt(twinkleSpeed[0]);
+    twinkleSpeed = value.toInt();
+    if (twinkleSpeed < 0) twinkleSpeed = 0;
+    else if (twinkleSpeed > 8) twinkleSpeed = 8;
+    broadcastInt("twinkleSpeed", twinkleSpeed);
+    sendInt(twinkleSpeed);
   });
 
   webServer.on("/twinkleDensity", HTTP_POST, []() {
     sendCors();
     String value = webServer.arg("value");
-    twinkleDensity[0] = value.toInt();
-    if (twinkleDensity[0] < 0) twinkleDensity[0] = 0;
-    else if (twinkleDensity[0] > 8) twinkleDensity[0] = 8;
-    broadcastInt("twinkleDensity", twinkleDensity[0]);
-    sendInt(twinkleDensity[0]);
+    twinkleDensity = value.toInt();
+    if (twinkleDensity < 0) twinkleDensity = 0;
+    else if (twinkleDensity > 8) twinkleDensity = 8;
+    broadcastInt("twinkleDensity", twinkleDensity);
+    sendInt(twinkleDensity);
   });
 
   webServer.on("/solidColor", HTTP_POST, []() {
@@ -434,6 +460,7 @@ void setupWebServer()
     sendCors();
     String value = webServer.arg("value");
     setPattern(value.toInt());
+    twinkleFoxPalette = palettes[currentPaletteIndex];
     sendInt(currentPatternIndex);
   });
 
@@ -464,7 +491,13 @@ void setupWebServer()
     setBrightness(value.toInt());
     sendInt(brightness);
   });
-  
+
+  webServer.on("/button", HTTP_POST, []() {
+    sendCors();
+    String value = webServer.arg("value");
+    remoteSwitch(value.charAt(0), value.substring(1).toInt());
+  });
+
   //list directory
   webServer.on("/list", HTTP_GET, handleFileList);
   //load editor
@@ -486,15 +519,19 @@ void setupWebServer()
   webServer.serveStatic("/", SPIFFS, "/", "max-age=86400");
 
   // list of headers to be recorded
-  const char * headerkeys[] = {"origin"};
-  size_t headerkeyssize = sizeof(headerkeys)/sizeof(char*);
+  const char* headerkeys[] = { "origin" };
+  size_t headerkeyssize = sizeof(headerkeys) / sizeof(char*);
 
   // ask server to track these headers
   webServer.collectHeaders(headerkeys, headerkeyssize);
 
   webServer.begin();
-
-
   Serial.println("HTTP web server started");
+}
 
+
+void remoteSwitch(char letter, uint8_t on)
+{
+    Serial.print(letter);
+  Serial.println(on > 0 ? " on" : " off");
 }

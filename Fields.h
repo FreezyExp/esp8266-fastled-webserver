@@ -16,7 +16,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-
 //String setPower(String value) {
 //  power = value.toInt();
 //  if(power < 0) power = 0;
@@ -26,6 +25,14 @@
 
 String getPower() {
   return String(power);
+}
+
+String getTimeOn() {
+  return String(SaveData.read(6));
+}
+
+String getTimeOff() {
+  return String(SaveData.read(7));
 }
 
 //String setBrightness(String value) {
@@ -88,15 +95,17 @@ String getSpeed() {
 }
 
 String getTwinkleSpeed() {
-  return String(twinkleSpeed[0]);
+  return String(twinkleSpeed);
 }
 
 String getTwinkleDensity() {
-  return String(twinkleDensity[0]);
+  return String(twinkleDensity);
 }
 
 FieldList fields = {
   { "power", "Power", BooleanFieldType, 0, 1, getPower },
+  { "timeOn", "Turn On:", TimeFieldType, 0, 1, getTimeOn },
+  { "timeOff", "Turn Off:", TimeFieldType, 0, 1, getTimeOff },
   { "brightness", "Brightness", NumberFieldType, 1, 255, getBrightness },
   { "pattern", "Pattern", SelectFieldType, 0, patternCount, getPattern, getPatterns },
   { "palette", "Palette", SelectFieldType, 0, paletteCount, getPalette, getPalettes },
