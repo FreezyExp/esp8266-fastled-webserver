@@ -80,12 +80,12 @@ CRGB gBackgroundColor = CRGB::Black;
 // then for any palette where the first two entries
 // are the same, a dimmed version of that color will
 // automatically be used as the background color.
-#define AUTO_SELECT_BACKGROUND_COLOR 0
+#define AUTO_SELECT_BACKGROUND_COLOR 1
 
 // If COOL_LIKE_INCANDESCENT is set to 1, colors will
 // fade out slighted 'reddened', similar to how
 // incandescent bulbs change color as they get dim down.
-#define COOL_LIKE_INCANDESCENT 1
+#define COOL_LIKE_INCANDESCENT 0
 
 CRGBPalette16 twinkleFoxPalette;
 
@@ -344,6 +344,10 @@ const TProgmemRGBPalette16 Ice_p FL_PROGMEM =
   Ice_Blue1, Ice_Blue1, Ice_Blue1, Ice_Blue1,
   Ice_Blue2, Ice_Blue2, Ice_Blue2, Ice_Blue3
 };
+
+void palletteTwinkles() {
+	drawTwinkles();
+}
 
 void redGreenWhiteTwinkles()
 {
