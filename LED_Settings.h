@@ -11,6 +11,7 @@
 
 #define DATA_PIN      D7
 #define LED_TYPE      WS2813
+#define LED_CORRECTION TypicalLEDStrip
 #define COLOR_ORDER   BRG
 #define NUM_LEDS      150
 
