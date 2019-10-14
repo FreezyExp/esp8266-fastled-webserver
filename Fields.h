@@ -102,8 +102,13 @@ String getTwinkleDensity() {
   return String(twinkleDensity);
 }
 
+String getSwitchNames() {
+  return "\"A\",\"B\",\"C\",\"F\"";
+}
+
 FieldList fields = {
   { "power", "Power", BooleanFieldType, 0, 1, getPower },
+  { "button", "Switch", ButtonFieldType, 0, 4, getPower, getSwitchNames },
   { "timeOn", "Turn On:", TimeFieldType, 0, 1, getTimeOn },
   { "timeOff", "Turn Off:", TimeFieldType, 0, 1, getTimeOff },
   { "brightness", "Brightness", NumberFieldType, 1, 255, getBrightness },
